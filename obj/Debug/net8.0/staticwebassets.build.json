@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "NxIKL0ttNVCu/S9MrZtFJIXSXLgnYK1Mb2Al/FKo8lk=",
+  "Source": "InvoiceMicroservice",
+  "BasePath": "_content/InvoiceMicroservice",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
