@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Temp\\Desktop\\pdf-generator\\InvoiceMicroservice\\InvoiceMicroservice.csproj": {}
+    "C:\\Users\\Temp\\Desktop\\document-microservice\\temp-microServe\\InvoiceMicroservice.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Temp\\Desktop\\pdf-generator\\InvoiceMicroservice\\InvoiceMicroservice.csproj": {
+    "C:\\Users\\Temp\\Desktop\\document-microservice\\temp-microServe\\InvoiceMicroservice.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Temp\\Desktop\\pdf-generator\\InvoiceMicroservice\\InvoiceMicroservice.csproj",
+        "projectUniqueName": "C:\\Users\\Temp\\Desktop\\document-microservice\\temp-microServe\\InvoiceMicroservice.csproj",
         "projectName": "InvoiceMicroservice",
-        "projectPath": "C:\\Users\\Temp\\Desktop\\pdf-generator\\InvoiceMicroservice\\InvoiceMicroservice.csproj",
+        "projectPath": "C:\\Users\\Temp\\Desktop\\document-microservice\\temp-microServe\\InvoiceMicroservice.csproj",
         "packagesPath": "C:\\Users\\Temp\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Temp\\Desktop\\pdf-generator\\InvoiceMicroservice\\obj\\",
+        "outputPath": "C:\\Users\\Temp\\Desktop\\document-microservice\\temp-microServe\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Temp\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -43,17 +43,29 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.10, )"
+            },
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[8.0.8, )"
             },
-            "QuestPDF": {
-              "target": "Package",
-              "version": "[2024.10.0, )"
-            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.4.0, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[8.1.2, )"
+            },
+            "itext7": {
+              "target": "Package",
+              "version": "[7.2.6, )"
+            },
+            "itext7.pdfhtml": {
+              "target": "Package",
+              "version": "[4.0.1, )"
             }
           },
           "imports": [
