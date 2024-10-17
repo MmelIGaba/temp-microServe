@@ -1,175 +1,166 @@
-using Microsoft.AspNetCore.Mvc;
-using InvoiceMicroservice.Models;
-using QuestPDF.Drawing;
-using QuestPDF.Fluent;
-using QuestPDF.Infrastructure;
+using System;
 using System.IO;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization; // for [Authorize]
+using InvoiceMicroservice.Models;
+using iText.Html2pdf;
 using System.Linq;
-// using QuestPDF.Settings; // Ensure this using directive is added
+using System.Collections.Generic;
+using iText.Kernel.Pdf;
+
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+
+public static class JwtTokenGenerator
+{
+	public static string GenerateJwtToken()
+	{
+		var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-very-long-secret-key1111222333444555666777888999")); 
+		var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+		var claims = new[]
+		{
+			new Claim(JwtRegisteredClaimNames.Sub, "TestUser"),
+			new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+			new Claim("role", "User") // Custom claim if required
+		};
+
+		var token = new JwtSecurityToken(
+			issuer: "PDFGenMicroservice", // Must match the issuer in Program.cs
+			audience: "PDFGenMicroserviceAPI", 
+			claims: claims,
+			expires: DateTime.Now.AddMinutes(30), 
+			signingCredentials: credentials
+		);
+
+		return new JwtSecurityTokenHandler().WriteToken(token);
+	}
+}
 
 namespace InvoiceMicroservice.Controllers
 {
-    [ApiController]
-    [Route("api/invoices")]
-    public class InvoiceController : ControllerBase
-    {
-        [HttpPost("generate")]
-        public IActionResult GenerateInvoice([FromBody] InvoiceRequest request)
-        {
-            // Validate the incoming request
-            var validationErrors = ValidateInvoiceRequest(request);
-            if (validationErrors.Any())
-            {
-                return BadRequest(new { Errors = validationErrors });
-            }
+	[ApiController]
+	[Route("api/invoices")]
+	[Authorize]  // Protects all endpoints in this controller
+	public class InvoiceController : ControllerBase
+	{
+		// New endpoint to generate a JWT token
+		[HttpGet("token")]
+		[AllowAnonymous] // Allow anyone to access this endpoint for token generation
+		public IActionResult GenerateToken()
+		{
+			string token = JwtTokenGenerator.GenerateJwtToken();
+			return Ok(new { Token = token });
+		}
+		
+		[HttpPost("generate")]
+		public IActionResult GenerateInvoice([FromBody] InvoiceRequest request)
+		{
+			var validationErrors = ValidateInvoiceRequest(request);
+			if (validationErrors.Any())
+			{
+				return BadRequest(new { Errors = validationErrors });
+			}
 
-            // Generate the invoice as a byte array
-            byte[] invoiceBytes = Generate(request);
+			try
+			{
+				byte[] invoiceBytes = Generate(request);
+				return File(invoiceBytes, "application/pdf", "Invoice.pdf");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error: {ex.Message} - {ex.StackTrace}");
+				return StatusCode(500, "An error occurred while generating the invoice.");
+			}
+		}
 
-            // Return the invoice as a file for download
-            return File(invoiceBytes, "application/pdf", "Invoice.pdf");
-        }
+		private byte[] Generate(InvoiceRequest request)
+		{
+			string htmlFilePath = @"C:\Users\Temp\Desktop\document-microservice\temp-microServe\Templates\InvoiceTemplate.html";
+			string htmlContent;
 
-        private byte[] Generate(InvoiceRequest request)
-        {
-            using var stream = new MemoryStream();
+			if (!System.IO.File.Exists(htmlFilePath))
+			{
+				throw new FileNotFoundException("Template file not found at the specified path.", htmlFilePath);
+			}
 
-            // Create the invoice document
-            var document = new InvoiceDocument(request);
+			try
+			{
+				htmlContent = System.IO.File.ReadAllText(htmlFilePath);
+				Console.WriteLine("HTML Content Loaded Successfully:");
+				Console.WriteLine(htmlContent);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception($"An error occurred while loading the HTML template: {ex.Message}");
+			}
 
-            // Render the document into the stream
-            document.GeneratePdf(stream);
+			htmlContent = htmlContent
+				.Replace("{{SellerCompanyName}}", request.SellerCompanyName)
+				.Replace("{{SellerAddress}}", request.SellerAddress)
+				.Replace("{{SellerEmail}}", request.SellerEmail)
+				.Replace("{{SellerPhone}}", request.SellerPhone)
+				.Replace("{{CustomerName}}", request.CustomerName ?? "")
+				.Replace("{{CustomerAddress}}", request.CustomerAddress ?? "")
+				.Replace("{{CustomerEmail}}", request.CustomerEmail ?? "")
+				.Replace("{{CustomerPhone}}", request.CustomerPhone ?? "")
+				.Replace("{{InvoiceContent}}", request.InvoiceContent)
+				.Replace("{{InvoiceNumber}}", request.InvoiceNumber.ToString());
 
-            // Return the byte array for the PDF
-            return stream.ToArray();
-        }
+			string itemRows = string.Join("", request.Items.Select(item =>
+				$"<tr><td>{item.Name}</td><td>{item.Quantity}</td><td>{item.Price:C}</td><td>{(item.Quantity * item.Price):C}</td></tr>"));
+			htmlContent = htmlContent.Replace("<!-- Placeholder for items, filled dynamically -->", itemRows);
 
-        private List<string> ValidateInvoiceRequest(InvoiceRequest request)
-        {
-            var errors = new List<string>();
+			decimal total = request.Items.Sum(item => item.Price * item.Quantity);
+			htmlContent = htmlContent.Replace("{{Total}}", total.ToString("C"));
 
-            if (request == null)
-            {
-                errors.Add("Invoice request cannot be null.");
-                return errors;
-            }
+			using var memoryStream = new MemoryStream();
+			using (var pdfWriter = new PdfWriter(memoryStream))
+			{
+				HtmlConverter.ConvertToPdf(htmlContent, pdfWriter);
+			}
 
-            if (string.IsNullOrWhiteSpace(request.SellerCompanyName))
-                errors.Add("Seller company name is required.");
-            if (string.IsNullOrWhiteSpace(request.SellerAddress))
-                errors.Add("Seller address is required.");
-            if (string.IsNullOrWhiteSpace(request.SellerEmail))
-                errors.Add("Seller email is required.");
-            if (string.IsNullOrWhiteSpace(request.SellerPhone))
-                errors.Add("Seller phone number is required.");
-            if (string.IsNullOrWhiteSpace(request.CustomerName))
-                errors.Add("Customer name is required.");
-            if (request.Items == null || !request.Items.Any())
-                errors.Add("At least one item is required in the invoice.");
-            else
-            {
-                foreach (var item in request.Items)
-                {
-                    if (string.IsNullOrWhiteSpace(item.Name))
-                        errors.Add("Item name is required.");
-                    if (item.Quantity <= 0)
-                        errors.Add("Item quantity must be greater than zero.");
-                    if (item.Price < 0)
-                        errors.Add("Item price cannot be negative.");
-                }
-            }
+			return memoryStream.ToArray();
+		}
 
-            return errors;
-        }
-    }
+		private List<string> ValidateInvoiceRequest(InvoiceRequest request)
+		{
+			var errors = new List<string>();
 
-    // Define the InvoiceDocument class which implements IDocument
-    public class InvoiceDocument : IDocument
-    {
-        private readonly InvoiceRequest Model;
+			if (request == null)
+			{
+				errors.Add("Invoice request cannot be null.");
+				return errors;
+			}
 
-        public InvoiceDocument(InvoiceRequest model)
-        {
-            Model = model;
-        }
+			if (string.IsNullOrWhiteSpace(request.SellerCompanyName))
+				errors.Add("Seller company name is required.");
+			if (string.IsNullOrWhiteSpace(request.SellerAddress))
+				errors.Add("Seller address is required.");
+			if (string.IsNullOrWhiteSpace(request.SellerEmail))
+				errors.Add("Seller email is required.");
+			if (string.IsNullOrWhiteSpace(request.SellerPhone))
+				errors.Add("Seller phone number is required.");
+			if (string.IsNullOrWhiteSpace(request.CustomerName))
+				errors.Add("Customer name is required.");
+			if (request.Items == null || !request.Items.Any())
+				errors.Add("At least one item is required in the invoice.");
+			else
+			{
+				foreach (var item in request.Items)
+				{
+					if (string.IsNullOrWhiteSpace(item.Name))
+						errors.Add("Item name is required.");
+					if (item.Quantity <= 0)
+						errors.Add("Item quantity must be greater than zero.");
+					if (item.Price < 0)
+						errors.Add("Item price cannot be negative.");
+				}
+			}
 
-        public DocumentMetadata GetMetadata() => new DocumentMetadata
-        {
-            Author = "TradeCraft",
-            CreationDate = Model.IssueDate,
-        };
-
-        public DocumentSettings GetSettings() => DocumentSettings.Default;
-
-        public void Compose(IDocumentContainer container)
-        {
-            container.Page(page =>
-            {
-                page.Margin(50);
-
-                // Header
-                page.Header().Element(ComposeHeader);
-
-                // Content
-                page.Content().Element(ComposeContent);
-
-                // Footer with page numbers
-                page.Footer().AlignCenter().Text(x =>
-                {
-                    x.CurrentPageNumber();
-                    x.Span(" / ");
-                    x.TotalPages();
-                });
-            });
-        }
-
-        private void ComposeHeader(IContainer container)
-        {
-            container.Row(row =>
-            {
-                row.RelativeItem().Column(column =>
-                {
-                    column.Item().Text($"Invoice for {Model.CustomerName}").FontSize(20).SemiBold();
-                    column.Item().Text(text =>
-                    {
-                        text.Span("Issue date: ").SemiBold();
-                        text.Span($"{Model.IssueDate:d}");
-                    });
-                    column.Item().Text(text =>
-                    {
-                        text.Span("Due date: ").SemiBold();
-                        text.Span($"{Model.DueDate:d}");
-                    });
-                });
-
-                row.ConstantItem(100).Height(50).Placeholder(); // Placeholder for future elements (e.g., logo)
-            });
-        }
-        private void ComposeContent(IContainer container)
-        {
-            container.PaddingVertical(40)
-                     .Background("#F0F0F0")
-                     .AlignCenter()
-                     .AlignMiddle()
-                     .Column(column => // Use a Column to hold multiple items
-                     {
-                         // Display each item in the invoice
-                         foreach (var item in Model.Items)
-                         {
-                             column.Item().Text($"{item.Quantity} x {item.Name} @ {item.Price:C} = {item.Quantity * item.Price:C}");
-                         }
-
-                         // Calculate and display the total
-                         decimal total = Model.Items.Sum(item => item.Price * item.Quantity);
-                         column.Item().Text($"Total: {total:C}").Bold().FontSize(18);
-
-                         // Optionally add invoice content if provided
-                         if (!string.IsNullOrEmpty(Model.InvoiceContent))
-                         {
-                             column.Item().PaddingTop(10).Text(Model.InvoiceContent);
-                         }
-                     });
-        }
-
-    }
+			return errors;
+		}
+	}
 }
