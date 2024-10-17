@@ -17,7 +17,7 @@ public static class JwtTokenGenerator
 {
 	public static string GenerateJwtToken()
 	{
-		var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-very-long-secret-key1111222333444555666777888999")); 
+		var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-very-long-secret-key111122233344455566777888999")); 
 		var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
 		var claims = new[]

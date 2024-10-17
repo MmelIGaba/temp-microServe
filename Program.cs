@@ -59,7 +59,7 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = "PDFGenMicroservice",  
         ValidAudience = "PDFGenMicroserviceAPI", 
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-very-long-secret-key1111222333444555666777888999"))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-very-long-secret-key111122233344455566777888999"))
     };
 });
 
